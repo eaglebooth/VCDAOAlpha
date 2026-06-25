@@ -17,10 +17,6 @@
   box-sizing: border-box;
 }
 
-html {
-  overflow-x: hidden;
-}
-
 body {
   margin: 0;
   background:
@@ -30,7 +26,6 @@ body {
     linear-gradient(180deg, #effaff 0%, #dff4ff 46%, #f7fcff 100%);
   color: var(--ink);
   font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  overflow-x: hidden;
 }
 
 button,
@@ -49,7 +44,7 @@ a {
 
 .page {
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .nav {
