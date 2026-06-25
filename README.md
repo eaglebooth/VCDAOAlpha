@@ -23,6 +23,10 @@ VC-DAO Alpha uses a GenLayer Intelligent Contract to:
 0x9798A3DccC928347E09aCb5e02E8056325966CA2
 ```
 
+## Live App
+
+https://vcdao-alpha.vercel.app
+
 ## Project Structure
 
 ```text
