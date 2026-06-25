@@ -18,17 +18,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-.page::-webkit-scrollbar {
-  display: none;
-  height: 0;
-  width: 0;
+  overflow-x: hidden;
 }
 
 body {
@@ -40,8 +30,7 @@ body {
     linear-gradient(180deg, #effaff 0%, #dff4ff 46%, #f7fcff 100%);
   color: var(--ink);
   font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-x: hidden;
 }
 
 button,
@@ -61,8 +50,6 @@ a {
 .page {
   min-height: 100vh;
   overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
 .nav {
