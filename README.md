@@ -17,6 +17,12 @@ VC-DAO Alpha uses a GenLayer Intelligent Contract to:
 - Run AI due diligence through `gl.nondet.exec_prompt`.
 - Reserve capital, issue term sheets, and record funded portfolio positions.
 
+## Deployed Contract
+
+```text
+0x9798A3DccC928347E09aCb5e02E8056325966CA2
+```
+
 ## Project Structure
 
 ```text
