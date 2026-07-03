@@ -20,7 +20,7 @@ VC-DAO Alpha uses a GenLayer Intelligent Contract to:
 ## Deployed Contract
 
 ```text
-0x9798A3DccC928347E09aCb5e02E8056325966CA2
+0x4C3871F3070eD5A6417D2eFd85B46e236B9A425B
 ```
 
 ## Live App
@@ -70,7 +70,7 @@ Set the deployed contract address:
 
 ```text
 NEXT_PUBLIC_CONTRACT_ADDRESS=<deployed-vcdaoalpha-address>
-NEXT_PUBLIC_NETWORK=testnetAsimov
+NEXT_PUBLIC_NETWORK=studionet
 NEXT_PUBLIC_GENLAYER_RPC=
 ```
 
