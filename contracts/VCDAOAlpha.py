@@ -61,7 +61,13 @@ class VCDAOAlpha(gl.Contract):
 
     @gl.public.write
     def initialize(self, owner: str, budget: u256, max_seed_ticket: u256, minimum_score: u256) -> str:
-        if len(self.fund_config[u256(0)]) > 0:
+        already_initialized = False
+        try:
+            if len(self.fund_config[u256(0)]) > 0:
+                already_initialized = True
+        except Exception:
+            pass
+        if already_initialized:
             return "ALREADY_INITIALIZED"
         if len(owner) == 0:
             return "INVALID_OWNER"
@@ -91,7 +97,12 @@ class VCDAOAlpha(gl.Contract):
         product_url: str,
         docs_url: str,
     ) -> typing.Any:
-        if len(self.fund_config[u256(0)]) == 0:
+        fund_owner = ""
+        try:
+            fund_owner = self.fund_config[u256(0)]
+        except Exception:
+            pass
+        if len(fund_owner) == 0:
             return "FUND_NOT_INITIALIZED"
         if len(name) == 0:
             return "INVALID_NAME"
@@ -340,14 +351,25 @@ Respond with ONLY strict JSON:
 
     @gl.public.view
     def get_fund_state(self) -> str:
+        owner_addr = ""
+        mandate_desc = ""
+        try:
+            owner_addr = self.fund_config[u256(0)]
+        except Exception:
+            pass
+        try:
+            mandate_desc = self.fund_config[u256(1)]
+        except Exception:
+            pass
+
         data = {
             "budget": str(self.fund_budget),
             "deployed": str(self.fund_deployed),
             "dry_powder": str(self.fund_budget - self.fund_reserved - self.fund_deployed),
-            "mandate": self.fund_config[u256(1)],
+            "mandate": mandate_desc,
             "max_ticket": str(self.max_ticket),
             "min_score": str(self.min_score),
-            "owner": self.fund_config[u256(0)],
+            "owner": owner_addr,
             "portfolio_count": str(self.portfolio_count),
             "reserved": str(self.fund_reserved),
             "startup_count": str(self.startup_count),
