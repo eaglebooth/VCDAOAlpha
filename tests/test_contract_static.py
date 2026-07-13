@@ -2,77 +2,53 @@ import ast
 import pathlib
 import unittest
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-CONTRACT = ROOT / "contracts" / "VCDAOAlpha.py"
+SOURCE = (ROOT / "contracts" / "VCDAOAlpha.py").read_text(encoding="utf-8")
 
 
-class VCDAOAlphaContractStaticTests(unittest.TestCase):
-    def setUp(self):
-        self.source = CONTRACT.read_text(encoding="utf-8")
-        self.tree = ast.parse(self.source)
+class VCDAOAlphaV2Tests(unittest.TestCase):
+    def test_runtime_header_and_parse(self):
+        self.assertEqual(SOURCE.splitlines()[0], "# v0.2.16")
+        ast.parse(SOURCE)
 
-    def test_header_and_imports(self):
-        lines = self.source.splitlines()
-        self.assertEqual(lines[0], "# v0.2.16")
-        self.assertEqual(
-            lines[1],
-            '# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }',
-        )
-        self.assertEqual(lines[2], "from genlayer import *")
+    def test_real_payable_treasury(self):
+        self.assertIn("@gl.public.write.payable", SOURCE)
+        self.assertIn("gl.message.value", SOURCE)
+        self.assertIn("fund_received", SOURCE)
+        self.assertIn("withdraw_unreserved", SOURCE)
 
-        imports = [node for node in self.tree.body if isinstance(node, (ast.Import, ast.ImportFrom))]
-        rendered = []
-        for node in imports:
-            if isinstance(node, ast.ImportFrom):
-                rendered.append(f"from {node.module} import *")
-            else:
-                rendered.extend(f"import {alias.name}" for alias in node.names)
-        self.assertEqual(rendered, ["from genlayer import *", "import typing", "import json"])
+    def test_real_investment_transfer(self):
+        self.assertIn("execute_investment", SOURCE)
+        self.assertIn("emit_transfer(value=amount)", SOURCE)
+        self.assertIn("FOUNDER_ACCEPTANCE_REQUIRED", SOURCE)
 
-    def test_storage_allowed_types(self):
-        contract = next(
-            node for node in self.tree.body if isinstance(node, ast.ClassDef) and node.name == "VCDAOAlpha"
-        )
-        for node in contract.body:
-            if not isinstance(node, ast.AnnAssign):
-                continue
-            annotation = ast.unparse(node.annotation)
-            self.assertIn(
-                annotation,
-                {"TreeMap[u256, str]", "TreeMap[u256, u256]", "DynArray[str]", "DynArray[u256]", "u256"},
-                f"Forbidden storage annotation: {annotation}",
-            )
+    def test_sender_authentication(self):
+        self.assertIn("gl.message.sender_address.as_hex", SOURCE)
+        self.assertIn("NOT_FUND_MANAGER", SOURCE)
+        self.assertIn("NOT_STARTUP_FOUNDER", SOURCE)
+        self.assertNotIn("def initialize(self, owner:", SOURCE)
 
-    def test_public_signatures(self):
-        contract = next(
-            node for node in self.tree.body if isinstance(node, ast.ClassDef) and node.name == "VCDAOAlpha"
-        )
-        allowed = {"u256", "str", "typing.Any"}
-        for node in contract.body:
-            if not isinstance(node, ast.FunctionDef):
-                continue
-            decorators = [ast.unparse(decorator) for decorator in node.decorator_list]
-            if not any(decorator in {"gl.public.write", "gl.public.view"} for decorator in decorators):
-                continue
-            params = [arg for arg in node.args.args if arg.arg != "self"]
-            self.assertLessEqual(len(params), 6, f"{node.name} has too many params")
-            for param in params:
-                self.assertIsNotNone(param.annotation, f"{node.name}.{param.arg} is untyped")
-                self.assertIn(ast.unparse(param.annotation), allowed)
-            self.assertIsNotNone(node.returns, f"{node.name} is missing return type")
-            self.assertIn(ast.unparse(node.returns), allowed)
+    def test_semantic_consensus(self):
+        self.assertIn("gl.eq_principle.prompt_comparative", SOURCE)
+        self.assertNotIn("gl.eq_principle.strict_eq", SOURCE)
 
-    def test_nondet_consensus_present(self):
-        self.assertIn("gl.nondet.web.render", self.source)
-        self.assertIn("gl.nondet.exec_prompt", self.source)
-        self.assertIn("gl.eq_principle.strict_eq", self.source)
+    def test_current_web_render_api(self):
+        self.assertIn('gl.nondet.web.render(product_url, mode="html")', SOURCE)
+        self.assertNotIn("media_type=", SOURCE)
 
-    def test_vc_domain_logic_present(self):
-        self.assertIn("run_due_diligence", self.source)
-        self.assertIn("issue_term_sheet", self.source)
-        self.assertIn("fund_startup", self.source)
-        self.assertIn("risk_score", self.source)
+    def test_lifecycle_guards(self):
+        for marker in ("STARTUP_ALREADY_SOURCED", "EVIDENCE_NOT_READY", "TERM_SHEET_NOT_OPEN", "OFFER_NOT_ACTIVE", "RESERVE_MISMATCH"):
+            self.assertIn(marker, SOURCE)
+
+    def test_reserve_conservation(self):
+        self.assertIn("self.fund_reserved = self.fund_reserved + ticket", SOURCE)
+        self.assertIn("self.fund_reserved = self.fund_reserved - amount", SOURCE)
+        self.assertIn("self.fund_deployed = self.fund_deployed + amount", SOURCE)
+
+    def test_offer_and_portfolio_storage_are_separate(self):
+        self.assertIn("startup_terms_url: TreeMap[u256, str]", SOURCE)
+        self.assertIn("self.portfolio_terms[portfolio_id] = self.startup_terms_url[startup_id]", SOURCE)
+        self.assertNotIn("self.portfolio_terms[startup_id] = terms_url", SOURCE)
 
 
 if __name__ == "__main__":

@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { WalletProvider } from "@/components/WalletProvider";
+import { AppShell } from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "VC-DAO Alpha",
-  description: "Autonomous GenLayer venture DAO for AI-driven seed investing.",
+  title: "VCDAO Alpha V2",
+  description: "An evidence-driven autonomous seed fund secured by GenLayer.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="en"><body><WalletProvider><AppShell>{children}</AppShell></WalletProvider></body></html>;
 }

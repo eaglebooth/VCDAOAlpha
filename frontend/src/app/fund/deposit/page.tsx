@@ -1,0 +1,1 @@
+import{PageHead}from"@/components/PageHead";import{ActionForm}from"@/components/ActionForm";export default function Page(){return <><PageHead kicker="Treasury / Deposit" title="Extend the fund runway." copy="Only the fund manager can add tracked treasury GEN through this payable action."/><section className="section compact"><ActionForm mode="deposit"/></section></>}

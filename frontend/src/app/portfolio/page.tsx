@@ -1,0 +1,1 @@
+import{PageHead}from"@/components/PageHead";import{Directory}from"@/components/Directory";export default function Page(){return <><PageHead kicker="Deployed capital" title="A portfolio backed by transfers, not ledger theater." copy="Every position here corresponds to an executed on-chain GEN transfer after founder acceptance."/><Directory kind="portfolio"/></>}
