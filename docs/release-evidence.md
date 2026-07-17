@@ -19,7 +19,7 @@ Runtime gates remain blocked until live reads and writes are recorded below.
 | Value proof | PARTIAL | Contract state records `1000` received and available after payable initialization; Explorer custody and founder transfer remain required |
 | Consensus | BLOCKED | Execute `run_due_diligence` on V3 and record transaction/state |
 | Address audit | PASS | V3 address is identical in local, example, and production frontend environments |
-| Production | BLOCKED | Deploy only after V3 address and lifecycle verification |
+| Production | PASS | `https://vcdao-alpha.vercel.app/contract` loaded the configured V3 address and returned the initialized Studionet state on 2026-07-17 with no browser console errors |
 | Provenance | BLOCKED | Verify founder/code/market evidence binding and document remaining source-authentication limits |
 | Limitations | PASS | No deployed-runtime or production-success claim is made |
 
