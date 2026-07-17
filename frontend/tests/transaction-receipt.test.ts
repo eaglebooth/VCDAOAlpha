@@ -18,3 +18,17 @@ test("requires post-state verification when Studionet omits execution metadata",
 test("does not mistake NOT_VOTED for success", () => {
   assert.equal(classifyReceipt({ txExecutionResultName: "NOT_VOTED" }).kind, "state_verification_required");
 });
+
+test("surfaces a unanimous validator GenVM error when SDK metadata is absent", () => {
+  const decision = classifyReceipt({
+    statusName: "FINALIZED",
+    consensus_data: {
+      validators: [
+        { genvm_result: { execution_result: "ERROR", stderr: "Traceback\nKeyError" } },
+        { genvm_result: { execution_result: "ERROR", stderr: "Traceback\nKeyError" } },
+      ],
+    },
+  });
+  assert.equal(decision.kind, "failure");
+  assert.match(decision.reason, /KeyError/);
+});

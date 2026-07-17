@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useContractAddress } from "./ContractProvider";
 import { useWallet } from "./WalletProvider";
 
-const links = [["How it works", "/how-it-works"], ["Fund", "/fund"], ["Startups", "/startups"], ["Portfolio", "/portfolio"], ["Contract", "/contract"]];
+const links = [["How it works", "/how-it-works"], ["Fund", "/fund"], ["Startups", "/startups"], ["Portfolio", "/portfolio"], ["Review", "/review"], ["Contract", "/contract"]];
 const short = (value: string) => value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "V3 pending";
 
 export function AppShell({ children }: { children: React.ReactNode }) {

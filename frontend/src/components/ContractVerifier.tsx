@@ -7,7 +7,12 @@ import { readContract } from "@/lib/genlayer";
 import { isContractAddress, useContractAddress } from "./ContractProvider";
 
 export function ContractVerifier() {
-  const { address, fallbackAddress, overridden, setAddress, resetAddress } = useContractAddress();
+  const contract = useContractAddress();
+  return <ContractVerifierForm key={contract.address} contract={contract} />;
+}
+
+function ContractVerifierForm({ contract }: { contract: ReturnType<typeof useContractAddress> }) {
+  const { address, fallbackAddress, overridden, setAddress, resetAddress } = contract;
   const [draft, setDraft] = useState(address);
   const [message, setMessage] = useState("Enter a Studionet deployment, then prove it with a live state read.");
   const [bad, setBad] = useState(false);
@@ -26,7 +31,13 @@ export function ContractVerifier() {
     setBusy(false);
     if (!result.success) {
       setBad(true);
-      setMessage(result.error || "Contract read failed.");
+      if (overridden && candidate.toLowerCase() === address.toLowerCase()) {
+        resetAddress();
+        setDraft(fallbackAddress);
+        setMessage(`${result.error || "Contract read failed."} The unavailable browser override was removed and the production deployment was restored.`);
+        return;
+      }
+      setMessage(result.error || "Contract read failed. The active production deployment was not changed.");
       return;
     }
     setAddress(candidate);

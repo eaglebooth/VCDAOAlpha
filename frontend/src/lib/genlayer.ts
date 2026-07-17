@@ -61,6 +61,7 @@ type GenLayerRuntimeClient = {
 
 export type ContractResult = {
   success: boolean;
+  pending?: boolean;
   data?: unknown;
   hash?: string;
   status?: string;
@@ -125,6 +126,8 @@ export async function writeContract(
     return { success: false, error: "Contract writes are only available in the browser" };
   }
 
+  let submittedHash = "";
+  let submittedClient: GenLayerRuntimeClient | null = null;
   try {
     const address = getContractAddress(contractAddress);
     if (!address) {
@@ -151,6 +154,7 @@ export async function writeContract(
     });
 
     const runtimeClient = writeClient as unknown as GenLayerRuntimeClient;
+    submittedClient = runtimeClient;
     if (runtimeClient.connect) await runtimeClient.connect(network);
     const hash = await runtimeClient.writeContract({
       address,
@@ -158,12 +162,13 @@ export async function writeContract(
       args,
       value,
     });
+    submittedHash = hash;
 
     const receipt = await runtimeClient.waitForTransactionReceipt({
       hash: hash as `0x${string}`,
       status: TransactionStatus.ACCEPTED,
       interval: 2_000,
-      retries: 45,
+      retries: 120,
       fullTransaction: false,
     });
 
@@ -194,6 +199,23 @@ export async function writeContract(
       verification: decision.kind === "success" ? "receipt" : "state_required",
     };
   } catch (error) {
+    if (submittedHash && submittedClient) {
+      try {
+        const transaction = await submittedClient.getTransaction({ hash: submittedHash as `0x${string}` });
+        const status = transaction.statusName || "PROCESSING";
+        if (["PENDING", "PROPOSING", "COMMITTING", "REVEALING", "ACCEPTED"].includes(status)) {
+          return {
+            success: false,
+            pending: true,
+            hash: submittedHash,
+            status,
+            error: `Transaction ${submittedHash} is still ${status}. Do not resubmit; monitor the existing transaction and sync state after consensus.`,
+          };
+        }
+      } catch {
+        // Preserve the original SDK error when transaction monitoring is unavailable.
+      }
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : "Write failed",

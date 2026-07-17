@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { readContract, writeContract } from "@/lib/genlayer";
 import { readFundState, type FundState, validateInitializeInput } from "@/lib/action-validation";
+import { nextAction, parseRecord, validateStartupAction, type StartupState } from "@/lib/workflow";
 import { useWallet } from "./WalletProvider";
 import { useContractAddress } from "./ContractProvider";
 
@@ -77,6 +78,7 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
   const [checkingState, setCheckingState] = useState(mode === "initialize" && Boolean(contract));
   const [initializedManager, setInitializedManager] = useState("");
   const [initializedFund, setInitializedFund] = useState<FundState | null>(null);
+  const [nextStep, setNextStep] = useState<{ href: string; label: string } | null>(null);
 
   useEffect(() => {
     if (mode !== "initialize" || !contract) {
@@ -148,6 +150,41 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
     }
 
     const target = snapshotTarget(mode, values.id);
+    setNextStep(null);
+    const fundRead = await readContract("get_fund_state", [], contract);
+    const fund = fundRead.success ? readFundState(fundRead.data) : null;
+    if (!fund) {
+      setBad(true);
+      setMessage(`Fund preflight failed: ${fundRead.error || "live fund state is unavailable"}`);
+      return;
+    }
+    if (mode === "source") {
+      if (BigInt(values.ticket) > BigInt(fund.max_ticket)) {
+        setBad(true);
+        setMessage(`Requested ticket exceeds the live ${fund.max_ticket} wei fund ceiling.`);
+        return;
+      }
+    }
+    if (["deposit", "withdraw"].includes(mode) && address.toLowerCase() !== fund.manager.toLowerCase()) {
+      setBad(true);
+      setMessage(`Connect the fund manager wallet ${fund.manager} to perform this action.`);
+      return;
+    }
+    if (["evidence", "diligence", "offer", "accept", "execute", "cancel"].includes(mode)) {
+      const startupRead = await readContract("get_startup", [BigInt(values.id)], contract);
+      const startup = startupRead.success ? parseRecord<StartupState>(startupRead.data) : null;
+      if (!startup || (startup as StartupState & { error?: string }).error) {
+        setBad(true);
+        setMessage(`Candidate preflight failed: ${(startup as StartupState & { error?: string } | null)?.error || startupRead.error || "record unavailable"}`);
+        return;
+      }
+      const validationError = validateStartupAction(mode, startup, address, fund.manager);
+      if (validationError) {
+        setBad(true);
+        setMessage(validationError);
+        return;
+      }
+    }
     const before = await readContract(target.functionName, target.args, contract);
     if (!before.success) {
       setBad(true);
@@ -172,8 +209,11 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
     const result = await writeContract(cfg[mode][0], args, contract, value);
     if (!result.success) {
       setBusy(false);
-      setBad(true);
+      setBad(!result.pending);
       setMessage(result.error || "Contract call failed.");
+      if (result.pending && mode === "diligence") {
+        setNextStep({ href: `/startups/${values.id}`, label: "Monitor candidate state" });
+      }
       return;
     }
 
@@ -193,6 +233,21 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
 
     setBad(false);
     setMessage(`Verified on-chain state change at ${result.status || "ACCEPTED"}. Transaction: ${result.hash}`);
+    if (mode === "initialize") {
+      const liveFund = readFundState(after.data);
+      if (liveFund?.manager) {
+        setInitializedFund(liveFund);
+        setInitializedManager(liveFund.manager);
+      }
+    }
+    let resolvedId = values.id;
+    if (mode === "source") {
+      const afterFund = readFundState(after.data);
+      if (afterFund && BigInt(afterFund.startup_count) > BigInt(0)) {
+        resolvedId = String(BigInt(afterFund.startup_count) - BigInt(1));
+      }
+    }
+    setNextStep(nextAction(mode, resolvedId));
   }
 
   const startupIdField = (
@@ -269,6 +324,7 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
         {checkingState ? "Checking treasury state" : address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
         <ArrowRight size={17} />
       </button>
+      {nextStep && <Link className="quiet-button next-step" href={nextStep.href}>{nextStep.label}<ArrowRight size={17} /></Link>}
       {!bad && message && <CheckCircle2 className="success-icon" />}
     </form>
   );

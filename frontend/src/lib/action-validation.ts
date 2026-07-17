@@ -31,6 +31,8 @@ export type FundState = {
   available: string;
   max_ticket: string;
   min_score: string;
+  startup_count: string;
+  portfolio_count: string;
 };
 
 export function readFundState(data: unknown): FundState | null {
@@ -43,6 +45,8 @@ export function readFundState(data: unknown): FundState | null {
       available: String(state.available || "0"),
       max_ticket: String(state.max_ticket || "0"),
       min_score: String(state.min_score || "0"),
+      startup_count: String(state.startup_count || "0"),
+      portfolio_count: String(state.portfolio_count || "0"),
     };
   } catch {
     return null;

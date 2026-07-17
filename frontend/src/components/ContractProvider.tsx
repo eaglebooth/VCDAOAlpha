@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { readContract } from "@/lib/genlayer";
+
 const fallbackAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 const storageKey = `vcdao-alpha.contract.${fallbackAddress || "runtime"}`;
 
@@ -30,9 +32,22 @@ export function ContractProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey) || "";
-    if (!isContractAddress(saved)) return;
-    const timer = window.setTimeout(() => updateAddress(saved), 0);
-    return () => window.clearTimeout(timer);
+    if (!isContractAddress(saved) || saved.toLowerCase() === fallbackAddress.toLowerCase()) {
+      if (saved && !isContractAddress(saved)) window.localStorage.removeItem(storageKey);
+      return;
+    }
+
+    let active = true;
+    void readContract("get_fund_state", [], saved).then((result) => {
+      if (!active) return;
+      if (result.success) {
+        updateAddress(saved);
+        return;
+      }
+      window.localStorage.removeItem(storageKey);
+      updateAddress(fallbackAddress);
+    });
+    return () => { active = false; };
   }, []);
 
   const value = useMemo<ContractState>(() => ({

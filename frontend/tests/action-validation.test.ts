@@ -27,6 +27,6 @@ test("detects an initialized manager from a contract view", () => {
 test("reads reviewer-facing treasury configuration", () => {
   assert.deepEqual(
     readFundState('{"manager":"0xabc","available":"1000","max_ticket":"250","min_score":"80"}'),
-    { manager: "0xabc", available: "1000", max_ticket: "250", min_score: "80" },
+    { manager: "0xabc", available: "1000", max_ticket: "250", min_score: "80", startup_count: "0", portfolio_count: "0" },
   );
 });

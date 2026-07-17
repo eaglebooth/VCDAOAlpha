@@ -31,10 +31,23 @@ class VCDAOAlphaV3StaticTests(unittest.TestCase):
     def test_semantic_consensus(self):
         self.assertIn("gl.eq_principle.prompt_comparative", SOURCE)
         self.assertNotIn("gl.eq_principle.strict_eq", SOURCE)
+        self.assertIn('response_format="json"', SOURCE)
+        self.assertIn("if not isinstance(data, dict)", SOURCE)
+        self.assertIn("NEEDS_REVIEW and REJECTED are equivalent", SOURCE)
+        self.assertIn("Ignore score, risk, ticket and memo differences when both deny capital", SOURCE)
 
     def test_current_web_render_api(self):
-        self.assertIn('gl.nondet.web.render(product_url, mode="html")', SOURCE)
+        self.assertIn('gl.nondet.web.render(url, mode="text")', SOURCE)
+        self.assertIn('read_evidence(product_url, "PRODUCT", 2200)', SOURCE)
+        self.assertIn('read_evidence(market_url, "MARKET", 1600)', SOURCE)
+        self.assertNotIn('mode="html"', SOURCE)
         self.assertNotIn("media_type=", SOURCE)
+
+    def test_web_failures_are_isolated_per_source(self):
+        self.assertIn("def read_evidence", SOURCE)
+        self.assertIn('"_UNAVAILABLE: source could not be rendered"', SOURCE)
+        self.assertIn("continue evaluating the readable sources", SOURCE)
+        self.assertNotIn("One or more evidence sources could not be read", SOURCE)
 
     def test_lifecycle_guards(self):
         for marker in ("STARTUP_ALREADY_SOURCED", "EVIDENCE_NOT_READY", "TERM_SHEET_NOT_OPEN", "OFFER_NOT_ACTIVE", "RESERVE_MISMATCH"):
@@ -52,7 +65,8 @@ class VCDAOAlphaV3StaticTests(unittest.TestCase):
 
     def test_duplicate_lookup_is_direct_and_not_history_sized(self):
         self.assertIn("startup_identity_index: TreeMap[str, u256]", SOURCE)
-        self.assertIn("self.startup_identity_index[identity_key]", SOURCE)
+        self.assertIn("self.startup_identity_index.get(identity_key, u256(0))", SOURCE)
+        self.assertNotIn("if self.startup_identity_index[identity_key]", SOURCE)
         self.assertNotIn("while i < self.startup_count", SOURCE)
 
 

@@ -17,7 +17,11 @@ investment judgment over live evidence directly controls real on-chain capital.
   metadata. Missing metadata requires post-write state verification.
 - Every action captures pre-state and refuses to report success unless the affected
   on-chain state changes.
+- Every write now runs a live role, status, and fund-limit preflight before opening
+  the wallet, then links to the next valid lifecycle page after verified state change.
 - A runtime contract page lets reviewers verify their deployment without rebuilding.
+- `/review` reads the active deployment and exposes the exact reviewer test path,
+  wallet-role matrix, lifecycle progress, and Explorer link.
 - Startup duplicate detection uses `TreeMap[str, u256]` instead of scanning all prior
   candidates in a write transaction.
 - The active V3 Studionet deployment is runtime-selectable and can be verified from `/contract`.
@@ -39,6 +43,7 @@ investment judgment over live evidence directly controls real on-chain capital.
 - `/startups`, `/startups/submit`, `/startups/[id]`
 - `/startups/[id]/evidence`, `/diligence`, `/term-sheet`, `/accept`, `/execute`, `/cancel`
 - `/portfolio`
+- `/review` live submission-readiness checklist and next-action routing
 - `/contract` runtime deployment verification
 - `/how-it-works`
 
@@ -56,18 +61,36 @@ npm run dev -- -p 3039
 
 ## Deployment status
 
-Status: `DEPLOYED_WRITE_VERIFIED_PARTIAL`. The V3 Studionet deployment is configured
-at `0x880F7Dd613e5B746079Ac4cb0311FbFD03Fba8bF`. A live initialization write and its
-post-state read passed on 2026-07-17. The remaining startup, diligence, offer,
-settlement, failure-path, and Explorer evidence must still pass before submission.
+Status: `RUNTIME_VERIFIED_READY_FOR_PRODUCTION`. The active Studionet deployment is
+`0x0B26B71d8B043039893182211211085Ef9e8619B`. Its schema exposes all 14 methods and
+the signed release run completed on 2026-07-17. The run proved payable treasury
+initialization, founder-authenticated sourcing and evidence, both `NEEDS_REVIEW` and
+`APPROVED` AI decisions, reserve accounting, term-sheet acceptance, a finalized
+100 wei recipient transfer, portfolio creation, deposit/withdraw transfers, duplicate
+protection, manager authorization, and overdraw protection. Exact transactions and
+before/after state are recorded in `docs/release-evidence.md`.
 
 Frontend configuration:
 
 ```env
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x880F7Dd613e5B746079Ac4cb0311FbFD03Fba8bF
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x0B26B71d8B043039893182211211085Ef9e8619B
 NEXT_PUBLIC_NETWORK=studionet
 NEXT_PUBLIC_GENLAYER_RPC=
 ```
 
-No claim of end-to-end execution is made until every required write is exercised on
-the new deployment and recorded in `docs/release-evidence.md`.
+All frontend environment templates point to the runtime-verified deployment.
+
+## Required signed release run
+
+The following release flow has been completed on the active deployment:
+
+1. A founder wallet sources one real startup with a ticket at or below `250` wei.
+2. The same founder wallet attaches public product, documentation, identity, code,
+   and independent market evidence.
+3. Run AI diligence and retain the transaction hash plus resulting memo.
+4. If approved, the manager issues terms, the founder accepts, and the manager
+   executes settlement. Confirm the founder balance transfer and portfolio record.
+5. Record every hash and before/after state in `docs/release-evidence.md`.
+
+The app deliberately blocks wrong-role and wrong-status actions before wallet
+signature. Reviewers can begin at `/review` and follow the live next-step button.

@@ -67,10 +67,15 @@ class VCDAOAlpha(gl.Contract):
     def _valid_url(self, value: str) -> bool:
         return value.startswith("https://") and len(value) <= 500
 
-    def _parse_diligence(self, result: str) -> typing.Any:
-        try:
-            data = json.loads(result)
-        except Exception:
+    def _parse_diligence(self, result: typing.Any) -> typing.Any:
+        if isinstance(result, str):
+            try:
+                data = json.loads(result)
+            except Exception:
+                return None
+        else:
+            data = result
+        if not isinstance(data, dict):
             return None
         decision = str(data.get("decision", "NEEDS_REVIEW")).upper()
         memo = str(data.get("memo", "The validator jury did not return a usable memo."))[:900]
@@ -136,7 +141,7 @@ class VCDAOAlpha(gl.Contract):
             return "INVALID_PRIMARY_EVIDENCE"
         founder = gl.message.sender_address.as_hex
         identity_key = founder + "|" + name.lower()
-        if self.startup_identity_index[identity_key] != u256(0):
+        if self.startup_identity_index.get(identity_key, u256(0)) != u256(0):
             return "STARTUP_ALREADY_SOURCED"
         startup_id = self.startup_count
         self.startup_name[startup_id] = name
@@ -192,15 +197,21 @@ class VCDAOAlpha(gl.Contract):
         min_required = self.min_score
         max_allowed = self.max_ticket
 
-        def run_review() -> str:
-            try:
-                product = gl.nondet.web.render(product_url, mode="html")[:2200]
-                docs = gl.nondet.web.render(docs_url, mode="html")[:2200]
-                founder = gl.nondet.web.render(founder_url, mode="html")[:1600]
-                code = gl.nondet.web.render(code_url, mode="html")[:1800]
-                market = gl.nondet.web.render(market_url, mode="html")[:1600]
-            except Exception:
-                return json.dumps({"decision":"NEEDS_REVIEW","overall_score":0,"risk_score":100,"recommended_ticket":0,"memo":"One or more evidence sources could not be read."}, sort_keys=True, separators=(",", ":"))
+        def run_review() -> typing.Any:
+            def read_evidence(url: str, label: str, limit: int) -> str:
+                try:
+                    content = gl.nondet.web.render(url, mode="text").strip()
+                    if len(content) < 80:
+                        return label + "_UNAVAILABLE: no substantive readable content"
+                    return content[:limit]
+                except Exception:
+                    return label + "_UNAVAILABLE: source could not be rendered"
+
+            product = read_evidence(product_url, "PRODUCT", 2200)
+            docs = read_evidence(docs_url, "DOCUMENTATION", 2200)
+            founder = read_evidence(founder_url, "FOUNDER", 1600)
+            code = read_evidence(code_url, "CODE", 1800)
+            market = read_evidence(market_url, "MARKET", 1600)
             prompt = f"""You are the independent GenLayer seed investment jury.
 Startup: {name}; sector: {sector}; requested ticket: {requested}.
 Fund minimum score: {min_required}; maximum ticket: {max_allowed}.
@@ -209,10 +220,10 @@ DOCUMENTATION: {docs}
 FOUNDER: {founder}
 CODE: {code}
 MARKET SIGNALS: {market}
-Assess market urgency, credible traction, technical feasibility, founder credibility, business model, and downside risk. APPROVED requires score >= 80, risk <= 35, concrete traction, credible founder evidence, and a defensible product. NEEDS_REVIEW means promising but materially incomplete. REJECTED means weak, unverifiable, or high risk. Recommended ticket cannot exceed the requested amount. Return ONLY JSON with decision, overall_score, risk_score, recommended_ticket, and one concise memo."""
-            return gl.nondet.exec_prompt(prompt)
+Assess market urgency, credible traction, technical feasibility, founder credibility, business model, and downside risk. Treat any field containing _UNAVAILABLE as missing evidence, but continue evaluating the readable sources. APPROVED requires score >= 80, risk <= 35, readable product and code evidence, concrete independent traction, credible founder evidence, and a defensible product. A repository, commit history, or other self-authored source is not independent market traction by itself; without verifiable independent traction, return NEEDS_REVIEW or REJECTED and recommend zero. NEEDS_REVIEW means promising but materially incomplete. REJECTED means weak, unverifiable, or high risk. Recommended ticket cannot exceed the requested amount. Return ONLY JSON with decision, overall_score, risk_score, recommended_ticket, and one concise memo."""
+            return gl.nondet.exec_prompt(prompt, response_format="json")
 
-        principle = "Decision, score band, risk band and recommended ticket must be materially equivalent because they control real treasury capital. APPROVED requires the same evidence-backed conclusion and eligibility thresholds. Memo wording may differ but must cite compatible evidence."
+        principle = "Compare the substantive capital decision, not prose or exact numbers. Outputs are equivalent when both either authorize capital with APPROVED or deny capital with NEEDS_REVIEW/REJECTED. NEEDS_REVIEW and REJECTED are equivalent because both authorize zero. Ignore score, risk, ticket and memo differences when both deny capital. If both approve, each must independently satisfy score >= 80, risk <= 35, recommend a positive ticket no greater than requested, and cite compatible independent traction; exact approved scores, risks, tickets and wording may differ."
         parsed = self._parse_diligence(gl.eq_principle.prompt_comparative(run_review, principle))
         if parsed is None:
             return "INVALID_AI_RESPONSE"
