@@ -15,7 +15,7 @@ Runtime gates remain blocked until live reads and writes are recorded below.
 | Local browser walkthrough | PASS | Home, runtime contract selector, and treasury initialization pages render on localhost with no browser console errors |
 | Runtime writes | PARTIAL | `initialize` passed with authenticated manager; execute and record the remaining writes |
 | State proof | PARTIAL | Initialization changed manager, received, available, max ticket and minimum score exactly as expected |
-| Failure proof | PARTIAL | Invalid initialization (`capital=1`, `max_ticket=2`) reached ACCEPTED without changing state at transaction `0x3a0af9b78be207722aed75e93e1c3a1ea8051da022c5c8d903f90918b4fb0813`; remaining wrong-role, duplicate, zero-value and replay paths are required |
+| Failure proof | PARTIAL | Invalid max-ticket and repeated-initialization paths both preserved state; remaining wrong-role, duplicate and zero-value paths are required |
 | Value proof | PARTIAL | Contract state records `1000` received and available after payable initialization; Explorer custody and founder transfer remain required |
 | Consensus | BLOCKED | Execute `run_due_diligence` on V3 and record transaction/state |
 | Address audit | PASS | V3 address is identical in local, example, and production frontend environments |
@@ -48,3 +48,4 @@ Explorer verification is not a pass.
 | Action | Input | Transaction | Expected result | Verified post-state | Status |
 |---|---|---|---|---|---|
 | `initialize` | capital `1`, max ticket `2`, score `80` | `0x3a0af9b78be207722aed75e93e1c3a1ea8051da022c5c8d903f90918b4fb0813` | `INVALID_MAX_TICKET` | manager empty; received, available and max ticket remain `0` | PASS |
+| `initialize` replay | capital `1000`, max ticket `250`, score `80` | `0x0802bf680d3e4ae4c857ebcde0f306d96dfe6310b2c0ed5917c4a196e229b98d` | `ALREADY_INITIALIZED` | manager and initialized treasury configuration remain unchanged | PASS |

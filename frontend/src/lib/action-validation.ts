@@ -21,3 +21,13 @@ export function validateInitializeInput(input: InitializeInput): string | null {
     return "Enter valid whole-number treasury values in wei.";
   }
 }
+
+export function readInitializedManager(data: unknown): string {
+  try {
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    if (!parsed || typeof parsed !== "object" || !("manager" in parsed)) return "";
+    return String((parsed as { manager?: unknown }).manager || "");
+  } catch {
+    return "";
+  }
+}

@@ -1,10 +1,11 @@
 "use client";
 
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { readContract, writeContract } from "@/lib/genlayer";
-import { validateInitializeInput } from "@/lib/action-validation";
+import { readInitializedManager, validateInitializeInput } from "@/lib/action-validation";
 import { useWallet } from "./WalletProvider";
 import { useContractAddress } from "./ContractProvider";
 
@@ -73,6 +74,31 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
   const [message, setMessage] = useState("");
   const [bad, setBad] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checkingState, setCheckingState] = useState(mode === "initialize" && Boolean(contract));
+  const [initializedManager, setInitializedManager] = useState("");
+
+  useEffect(() => {
+    if (mode !== "initialize" || !contract) {
+      return;
+    }
+
+    let cancelled = false;
+    async function checkInitialization() {
+      const state = await readContract("get_fund_state", [], contract);
+      if (cancelled) return;
+      const manager = state.success ? readInitializedManager(state.data) : "";
+      setInitializedManager(manager);
+      if (manager) {
+        setBad(false);
+        setMessage(`Treasury is already initialized by ${manager}. Use the Fund dashboard for treasury operations.`);
+      }
+      setCheckingState(false);
+    }
+    void checkInitialization();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract, mode]);
 
   const update = (key: keyof typeof values, value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -125,6 +151,15 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
       setMessage(`Pre-write verification failed: ${before.error || "state unavailable"}`);
       return;
     }
+    if (mode === "initialize") {
+      const manager = readInitializedManager(before.data);
+      if (manager) {
+        setInitializedManager(manager);
+        setBad(false);
+        setMessage(`Treasury is already initialized by ${manager}. Use the Fund dashboard for treasury operations.`);
+        return;
+      }
+    }
 
     setBusy(true);
     setBad(false);
@@ -171,9 +206,9 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
       <div className="field-grid">
         {mode === "initialize" && (
           <>
-            <Field label="Initial treasury capital (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>
-            <Field label="Maximum seed ticket (wei)"><input type="number" min="1" max={values.value || undefined} value={values.max} onChange={(event) => update("max", event.target.value)} required /></Field>
-            <Field label="Minimum approval score"><input type="number" min="60" max="100" value={values.score} onChange={(event) => update("score", event.target.value)} required /></Field>
+            <Field label="Initial treasury capital (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} disabled={Boolean(initializedManager)} required /></Field>
+            <Field label="Maximum seed ticket (wei)"><input type="number" min="1" max={values.value || undefined} value={values.max} onChange={(event) => update("max", event.target.value)} disabled={Boolean(initializedManager)} required /></Field>
+            <Field label="Minimum approval score"><input type="number" min="60" max="100" value={values.score} onChange={(event) => update("score", event.target.value)} disabled={Boolean(initializedManager)} required /></Field>
           </>
         )}
         {mode === "deposit" && <Field label="Deposit value (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>}
@@ -199,10 +234,14 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
         {mode === "withdraw" && <Field label="Withdrawal amount (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>}
       </div>
       {message && <div className={`notice ${bad ? "error" : ""}`}>{message}</div>}
-      <button className="primary-button" disabled={busy}>
-        {address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
-        <ArrowRight size={17} />
-      </button>
+      {initializedManager ? (
+        <Link className="primary-button" href="/fund">View live fund <ArrowRight size={17} /></Link>
+      ) : (
+        <button className="primary-button" disabled={busy || checkingState}>
+          {checkingState ? "Checking treasury state" : address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
+          <ArrowRight size={17} />
+        </button>
+      )}
       {!bad && message && <CheckCircle2 className="success-icon" />}
     </form>
   );
