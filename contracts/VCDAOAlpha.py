@@ -23,6 +23,7 @@ class VCDAOAlpha(gl.Contract):
     max_ticket: u256
     min_score: u256
     startup_count: u256
+    startup_identity_index: TreeMap[str, u256]
     startup_name: TreeMap[u256, str]
     startup_founder: TreeMap[u256, str]
     startup_sector: TreeMap[u256, str]
@@ -134,11 +135,9 @@ class VCDAOAlpha(gl.Contract):
         if not self._valid_url(product_url) or not self._valid_url(docs_url):
             return "INVALID_PRIMARY_EVIDENCE"
         founder = gl.message.sender_address.as_hex
-        i = u256(0)
-        while i < self.startup_count:
-            if self.startup_founder[i] == founder and self.startup_name[i] == name:
-                return "STARTUP_ALREADY_SOURCED"
-            i = i + u256(1)
+        identity_key = founder + "|" + name.lower()
+        if self.startup_identity_index[identity_key] != u256(0):
+            return "STARTUP_ALREADY_SOURCED"
         startup_id = self.startup_count
         self.startup_name[startup_id] = name
         self.startup_founder[startup_id] = founder
@@ -156,6 +155,7 @@ class VCDAOAlpha(gl.Contract):
         self.startup_decision[startup_id] = "PENDING"
         self.startup_ai_memo[startup_id] = "Evidence has not been reviewed."
         self.startup_terms_url[startup_id] = ""
+        self.startup_identity_index[identity_key] = startup_id + u256(1)
         self.startup_count = startup_id + u256(1)
         return str(startup_id)
 

@@ -6,7 +6,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SOURCE = (ROOT / "contracts" / "VCDAOAlpha.py").read_text(encoding="utf-8")
 
 
-class VCDAOAlphaV2Tests(unittest.TestCase):
+class VCDAOAlphaV3StaticTests(unittest.TestCase):
     def test_runtime_header_and_parse(self):
         self.assertEqual(SOURCE.splitlines()[0], "# v0.2.16")
         ast.parse(SOURCE)
@@ -49,6 +49,11 @@ class VCDAOAlphaV2Tests(unittest.TestCase):
         self.assertIn("startup_terms_url: TreeMap[u256, str]", SOURCE)
         self.assertIn("self.portfolio_terms[portfolio_id] = self.startup_terms_url[startup_id]", SOURCE)
         self.assertNotIn("self.portfolio_terms[startup_id] = terms_url", SOURCE)
+
+    def test_duplicate_lookup_is_direct_and_not_history_sized(self):
+        self.assertIn("startup_identity_index: TreeMap[str, u256]", SOURCE)
+        self.assertIn("self.startup_identity_index[identity_key]", SOURCE)
+        self.assertNotIn("while i < self.startup_count", SOURCE)
 
 
 if __name__ == "__main__":

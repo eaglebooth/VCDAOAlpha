@@ -1,6 +1,209 @@
 "use client";
-import{ArrowRight,CheckCircle2}from"lucide-react";import{useState}from"react";import{writeContract,readContract}from"@/lib/genlayer";import{useWallet}from"./WalletProvider";
-type Mode="initialize"|"deposit"|"source"|"evidence"|"diligence"|"offer"|"accept"|"execute"|"cancel"|"withdraw";
-const cfg:Record<Mode,[string,string]>={initialize:["initialize","Initialize treasury"],deposit:["deposit_treasury","Deposit treasury GEN"],source:["source_startup","Submit startup"],evidence:["attach_evidence","Attach evidence"],diligence:["run_due_diligence","Run AI diligence"],offer:["issue_term_sheet","Issue term sheet"],accept:["accept_term_sheet","Accept term sheet"],execute:["execute_investment","Execute investment"],cancel:["cancel_term_sheet","Cancel offer"],withdraw:["withdraw_unreserved","Withdraw unreserved GEN"]};
-export function ActionForm({mode,startupId=""}:{mode:Mode;startupId?:string}){const contract=process.env.NEXT_PUBLIC_CONTRACT_ADDRESS||"";const{address,connect}=useWallet();const[v,setV]=useState({id:startupId,name:"",sector:"",ticket:"",product:"",docs:"",founder:"",code:"",market:"",terms:"",value:"",max:"",score:"80"});const[msg,setMsg]=useState("");const[bad,setBad]=useState(false);const[busy,setBusy]=useState(false);const u=(k:keyof typeof v,x:string)=>setV(s=>({...s,[k]:x}));async function submit(e:React.FormEvent){e.preventDefault();if(!address){await connect();return}if(!contract){setBad(true);setMsg("VCDAO Alpha V2 contract address is not configured.");return}let args:unknown[]=[];let value=BigInt(0);try{if(mode==="initialize"){args=[BigInt(v.max),BigInt(v.score)];value=BigInt(v.value)}if(mode==="deposit"){value=BigInt(v.value)}if(mode==="source")args=[v.name,v.sector,BigInt(v.ticket),v.product,v.docs];if(mode==="evidence")args=[BigInt(v.id),v.founder,v.code,v.market];if(mode==="diligence"||mode==="accept"||mode==="execute"||mode==="cancel")args=[BigInt(v.id)];if(mode==="offer")args=[BigInt(v.id),v.terms];if(mode==="withdraw")args=[BigInt(v.value)]}catch{setBad(true);setMsg("Enter valid whole-number IDs and GEN amounts in wei.");return}setBusy(true);setBad(false);setMsg("Confirm the transaction and wait for validator finalization...");const r=await writeContract(cfg[mode][0],args,contract,value);setBusy(false);if(!r.success){setBad(true);setMsg(r.error||"Contract call failed");return}const check=await readContract("get_fund_state",[],contract);setMsg(`${String(r.data??r.status??"Finalized")}. ${check.success?"Live state read-back succeeded.":"State read-back failed."}`)}return <form className="action-card" onSubmit={submit}><div className="form-title"><span>Contract action</span><h2>{cfg[mode][1]}</h2><code>{cfg[mode][0]}</code></div><div className="field-grid">{mode==="initialize"&&<><F l="Initial treasury capital (wei)"><input type="number" min="1" value={v.value} onChange={e=>u("value",e.target.value)} required/></F><F l="Maximum seed ticket (wei)"><input type="number" min="1" value={v.max} onChange={e=>u("max",e.target.value)} required/></F><F l="Minimum approval score"><input type="number" min="60" max="100" value={v.score} onChange={e=>u("score",e.target.value)} required/></F></>}{mode==="deposit"&&<F l="Deposit value (wei)"><input type="number" min="1" value={v.value} onChange={e=>u("value",e.target.value)} required/></F>}{mode==="source"&&<><F l="Startup name"><input value={v.name} onChange={e=>u("name",e.target.value)} required/></F><F l="Sector"><input value={v.sector} onChange={e=>u("sector",e.target.value)} required/></F><F l="Requested ticket (wei)"><input type="number" min="1" value={v.ticket} onChange={e=>u("ticket",e.target.value)} required/></F><F l="Product URL"><input type="url" value={v.product} onChange={e=>u("product",e.target.value)} required/></F><F l="Documentation URL"><input type="url" value={v.docs} onChange={e=>u("docs",e.target.value)} required/></F></>}{mode==="evidence"&&<><Id/><F l="Founder profile URL"><input type="url" value={v.founder} onChange={e=>u("founder",e.target.value)} required/></F><F l="Code repository URL"><input type="url" value={v.code} onChange={e=>u("code",e.target.value)} required/></F><F l="Market evidence URL"><input type="url" value={v.market} onChange={e=>u("market",e.target.value)} required/></F></>}{(mode==="diligence"||mode==="accept"||mode==="execute"||mode==="cancel")&&<Id/>}{mode==="offer"&&<><Id/><F l="Immutable term sheet URL"><input type="url" value={v.terms} onChange={e=>u("terms",e.target.value)} required/></F></>}{mode==="withdraw"&&<F l="Withdrawal amount (wei)"><input type="number" min="1" value={v.value} onChange={e=>u("value",e.target.value)} required/></F>}</div>{msg&&<div className={`notice ${bad?"error":""}`}>{msg}</div>}<button className="primary-button" disabled={busy}>{address?busy?"Waiting for consensus":cfg[mode][1]:"Connect wallet first"}<ArrowRight size={17}/></button>{!bad&&msg&&<CheckCircle2 className="success-icon"/>}</form>;function Id(){return <F l="Startup ID"><input type="number" min="0" value={v.id} onChange={e=>u("id",e.target.value)} required/></F>}}
-function F({l,children}:{l:string;children:React.ReactNode}){return <label className="field"><span>{l}</span>{children}</label>}
+
+import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+
+import { readContract, writeContract } from "@/lib/genlayer";
+import { validateInitializeInput } from "@/lib/action-validation";
+import { useWallet } from "./WalletProvider";
+import { useContractAddress } from "./ContractProvider";
+
+type Mode =
+  | "initialize"
+  | "deposit"
+  | "source"
+  | "evidence"
+  | "diligence"
+  | "offer"
+  | "accept"
+  | "execute"
+  | "cancel"
+  | "withdraw";
+
+const cfg: Record<Mode, [string, string]> = {
+  initialize: ["initialize", "Initialize treasury"],
+  deposit: ["deposit_treasury", "Deposit capital"],
+  source: ["source_startup", "Submit startup"],
+  evidence: ["attach_evidence", "Attach founder evidence"],
+  diligence: ["run_due_diligence", "Run AI diligence"],
+  offer: ["issue_term_sheet", "Issue term sheet"],
+  accept: ["accept_term_sheet", "Accept term sheet"],
+  execute: ["execute_investment", "Execute investment"],
+  cancel: ["cancel_term_sheet", "Cancel offer"],
+  withdraw: ["withdraw_unreserved", "Withdraw unreserved GEN"],
+};
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function snapshotTarget(mode: Mode, startupId: string) {
+  if (["evidence", "offer", "accept", "execute", "cancel"].includes(mode)) {
+    return { functionName: "get_startup", args: [BigInt(startupId)] };
+  }
+  if (mode === "diligence") {
+    return { functionName: "get_diligence", args: [BigInt(startupId)] };
+  }
+  return { functionName: "get_fund_state", args: [] };
+}
+
+export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: string }) {
+  const { address: contract } = useContractAddress();
+  const { address, connect } = useWallet();
+  const [values, setValues] = useState({
+    id: startupId,
+    name: "",
+    sector: "",
+    ticket: "",
+    product: "",
+    docs: "",
+    founder: "",
+    code: "",
+    market: "",
+    terms: "",
+    value: "",
+    max: "",
+    score: "80",
+  });
+  const [message, setMessage] = useState("");
+  const [bad, setBad] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const update = (key: keyof typeof values, value: string) =>
+    setValues((current) => ({ ...current, [key]: value }));
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!address) {
+      await connect();
+      return;
+    }
+    if (!contract) {
+      setBad(true);
+      setMessage("VCDAO Alpha contract address is not configured.");
+      return;
+    }
+
+    let args: unknown[] = [];
+    let value = BigInt(0);
+    try {
+      if (mode === "initialize") {
+        const validationError = validateInitializeInput({
+          capital: values.value,
+          maxTicket: values.max,
+          minimumScore: values.score,
+        });
+        if (validationError) {
+          setBad(true);
+          setMessage(validationError);
+          return;
+        }
+        args = [BigInt(values.max), BigInt(values.score)];
+        value = BigInt(values.value);
+      }
+      if (mode === "deposit") value = BigInt(values.value);
+      if (mode === "source") args = [values.name, values.sector, BigInt(values.ticket), values.product, values.docs];
+      if (mode === "evidence") args = [BigInt(values.id), values.founder, values.code, values.market];
+      if (["diligence", "accept", "execute", "cancel"].includes(mode)) args = [BigInt(values.id)];
+      if (mode === "offer") args = [BigInt(values.id), values.terms];
+      if (mode === "withdraw") args = [BigInt(values.value)];
+    } catch {
+      setBad(true);
+      setMessage("Enter valid whole-number IDs and GEN amounts in wei.");
+      return;
+    }
+
+    const target = snapshotTarget(mode, values.id);
+    const before = await readContract(target.functionName, target.args, contract);
+    if (!before.success) {
+      setBad(true);
+      setMessage(`Pre-write verification failed: ${before.error || "state unavailable"}`);
+      return;
+    }
+
+    setBusy(true);
+    setBad(false);
+    setMessage("Confirm the transaction. VCDAO Alpha will verify accepted execution against live state.");
+    const result = await writeContract(cfg[mode][0], args, contract, value);
+    if (!result.success) {
+      setBusy(false);
+      setBad(true);
+      setMessage(result.error || "Contract call failed.");
+      return;
+    }
+
+    const after = await readContract(target.functionName, target.args, contract);
+    setBusy(false);
+    if (!after.success) {
+      setBad(true);
+      setMessage(`Transaction ${result.hash || "submitted"}, but post-write state could not be verified: ${after.error || "read failed"}`);
+      return;
+    }
+    if (String(before.data) === String(after.data)) {
+      setBad(true);
+      const contractResult = result.data ? ` Contract result: ${String(result.data)}.` : "";
+      setMessage(`Transaction ${result.hash || "submitted"} reached ${result.status || "ACCEPTED"}, but the contract did not change state.${contractResult} Check the input rules before retrying.`);
+      return;
+    }
+
+    setBad(false);
+    setMessage(`Verified on-chain state change at ${result.status || "ACCEPTED"}. Transaction: ${result.hash}`);
+  }
+
+  const startupIdField = (
+    <Field label="Startup ID">
+      <input type="number" min="0" value={values.id} onChange={(event) => update("id", event.target.value)} required />
+    </Field>
+  );
+
+  return (
+    <form className="action-card" onSubmit={submit}>
+      <div className="form-title">
+        <span>Contract action</span>
+        <h2>{cfg[mode][1]}</h2>
+        <code>{cfg[mode][0]}</code>
+      </div>
+      <div className="field-grid">
+        {mode === "initialize" && (
+          <>
+            <Field label="Initial treasury capital (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>
+            <Field label="Maximum seed ticket (wei)"><input type="number" min="1" max={values.value || undefined} value={values.max} onChange={(event) => update("max", event.target.value)} required /></Field>
+            <Field label="Minimum approval score"><input type="number" min="60" max="100" value={values.score} onChange={(event) => update("score", event.target.value)} required /></Field>
+          </>
+        )}
+        {mode === "deposit" && <Field label="Deposit value (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>}
+        {mode === "source" && (
+          <>
+            <Field label="Startup name"><input value={values.name} onChange={(event) => update("name", event.target.value)} required /></Field>
+            <Field label="Sector"><input value={values.sector} onChange={(event) => update("sector", event.target.value)} required /></Field>
+            <Field label="Requested ticket (wei)"><input type="number" min="1" value={values.ticket} onChange={(event) => update("ticket", event.target.value)} required /></Field>
+            <Field label="Product URL"><input type="url" value={values.product} onChange={(event) => update("product", event.target.value)} required /></Field>
+            <Field label="Documentation URL"><input type="url" value={values.docs} onChange={(event) => update("docs", event.target.value)} required /></Field>
+          </>
+        )}
+        {mode === "evidence" && (
+          <>
+            {startupIdField}
+            <Field label="Founder profile URL"><input type="url" value={values.founder} onChange={(event) => update("founder", event.target.value)} required /></Field>
+            <Field label="Code repository URL"><input type="url" value={values.code} onChange={(event) => update("code", event.target.value)} required /></Field>
+            <Field label="Market evidence URL"><input type="url" value={values.market} onChange={(event) => update("market", event.target.value)} required /></Field>
+          </>
+        )}
+        {["diligence", "accept", "execute", "cancel"].includes(mode) && startupIdField}
+        {mode === "offer" && <>{startupIdField}<Field label="Immutable term sheet URL"><input type="url" value={values.terms} onChange={(event) => update("terms", event.target.value)} required /></Field></>}
+        {mode === "withdraw" && <Field label="Withdrawal amount (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>}
+      </div>
+      {message && <div className={`notice ${bad ? "error" : ""}`}>{message}</div>}
+      <button className="primary-button" disabled={busy}>
+        {address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
+        <ArrowRight size={17} />
+      </button>
+      {!bad && message && <CheckCircle2 className="success-icon" />}
+    </form>
+  );
+}

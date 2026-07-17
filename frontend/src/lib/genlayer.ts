@@ -5,7 +5,8 @@ import {
   testnetAsimov,
   testnetBradbury,
 } from "genlayer-js/chains";
-import { ExecutionResult, TransactionStatus } from "genlayer-js/types";
+import { TransactionStatus } from "genlayer-js/types";
+import { classifyReceipt, type ReceiptLike } from "./transaction-receipt";
 
 type NetworkName =
   | "localnet"
@@ -51,11 +52,11 @@ type GenLayerRuntimeClient = {
   waitForTransactionReceipt: (args: {
     hash: `0x${string}`;
     status: string;
-  }) => Promise<{
-    statusName?: string;
-    txExecutionResultName?: string;
-    txDataDecoded?: unknown;
-  }>;
+    interval?: number;
+    retries?: number;
+    fullTransaction?: boolean;
+  }) => Promise<ReceiptLike>;
+  getTransaction: (args: { hash: `0x${string}` }) => Promise<ReceiptLike>;
 };
 
 export type ContractResult = {
@@ -64,6 +65,7 @@ export type ContractResult = {
   hash?: string;
   status?: string;
   error?: string;
+  verification?: "receipt" | "state_required";
 };
 
 function getContractAddress(contractAddress?: string) {
@@ -159,23 +161,37 @@ export async function writeContract(
 
     const receipt = await runtimeClient.waitForTransactionReceipt({
       hash: hash as `0x${string}`,
-      status: TransactionStatus.FINALIZED,
+      status: TransactionStatus.ACCEPTED,
+      interval: 2_000,
+      retries: 45,
+      fullTransaction: false,
     });
 
-    if (receipt.txExecutionResultName !== ExecutionResult.FINISHED_WITH_RETURN) {
+    let observedReceipt = receipt;
+    if (!observedReceipt.txExecutionResultName) {
+      try {
+        observedReceipt = await runtimeClient.getTransaction({ hash: hash as `0x${string}` });
+      } catch {
+        observedReceipt = receipt;
+      }
+    }
+
+    const decision = classifyReceipt(observedReceipt);
+    if (decision.kind === "failure") {
       return {
         success: false,
         hash,
-        status: receipt.statusName,
-        error: `Contract execution did not finish successfully: ${receipt.txExecutionResultName || "UNKNOWN"}`,
+        status: observedReceipt.statusName || receipt.statusName,
+        error: decision.reason,
       };
     }
 
     return {
       success: true,
       hash,
-      status: receipt.statusName,
-      data: receipt.txDataDecoded,
+      status: observedReceipt.statusName || receipt.statusName,
+      data: observedReceipt.txDataDecoded ?? receipt.txDataDecoded,
+      verification: decision.kind === "success" ? "receipt" : "state_required",
     };
   } catch (error) {
     return {

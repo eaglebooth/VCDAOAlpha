@@ -1,5 +1,31 @@
 "use client";
-import Link from "next/link";import{ExternalLink,Landmark,Menu,Wallet,X}from"lucide-react";import{useState}from"react";import{useWallet}from"./WalletProvider";
-const links=[["How it works","/how-it-works"],["Fund","/fund"],["Startups","/startups"],["Portfolio","/portfolio"]];
-const short=(s:string)=>s?`${s.slice(0,6)}...${s.slice(-4)}`:"V2 pending";
-export function AppShell({children}:{children:React.ReactNode}){const{address,busy,connect}=useWallet();const[open,setOpen]=useState(false);const contract=process.env.NEXT_PUBLIC_CONTRACT_ADDRESS||"";return <main className="page"><nav className="nav"><Link className="brand" href="/"><span><Landmark size={21}/></span>VCDAO <b>Alpha</b></Link><div className="nav-links">{links.map(([l,h])=><Link href={h} key={h}>{l}</Link>)}</div><div className="nav-tools"><a className="contract-pill" href={contract?`https://explorer-studio.genlayer.com/address/${contract}`:"https://explorer-studio.genlayer.com/contracts"} target="_blank" rel="noreferrer">{short(contract)}<ExternalLink size={12}/></a><button className="wallet-button" onClick={connect} disabled={busy}><Wallet size={16}/>{address?short(address):busy?"Connecting":"Connect wallet"}</button></div><button className="menu" onClick={()=>setOpen(!open)} aria-label="Toggle navigation">{open?<X/>:<Menu/>}</button></nav>{open&&<div className="mobile-nav">{links.map(([l,h])=><Link href={h} onClick={()=>setOpen(false)} key={h}>{l}</Link>)}</div>}{children}<footer><strong>VCDAO Alpha V2</strong><span>Evidence diligence. Founder consent. Real treasury settlement.</span></footer></main>}
+
+import { ExternalLink, Landmark, Menu, Wallet, X } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
+
+import { useContractAddress } from "./ContractProvider";
+import { useWallet } from "./WalletProvider";
+
+const links = [["How it works", "/how-it-works"], ["Fund", "/fund"], ["Startups", "/startups"], ["Portfolio", "/portfolio"], ["Contract", "/contract"]];
+const short = (value: string) => value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "V3 pending";
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { address: wallet, busy, connect } = useWallet();
+  const { address: contract, overridden } = useContractAddress();
+  const [open, setOpen] = useState(false);
+  return <main className="page">
+    <nav className="nav">
+      <Link className="brand" href="/"><span><Landmark size={21} /></span>VCDAO <b>Alpha</b></Link>
+      <div className="nav-links">{links.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}</div>
+      <div className="nav-tools">
+        <Link className="contract-pill" href="/contract" title={overridden ? "Browser-local contract override" : "Production contract"}>{short(contract)}{overridden ? " local" : ""}<ExternalLink size={12} /></Link>
+        <button className="wallet-button" onClick={connect} disabled={busy}><Wallet size={16} />{wallet ? short(wallet) : busy ? "Connecting" : "Connect wallet"}</button>
+      </div>
+      <button className="menu" onClick={() => setOpen(!open)} aria-label="Toggle navigation">{open ? <X /> : <Menu />}</button>
+    </nav>
+    {open && <div className="mobile-nav">{links.map(([label, href]) => <Link href={href} onClick={() => setOpen(false)} key={href}>{label}</Link>)}</div>}
+    {children}
+    <footer><strong>VCDAO Alpha V3</strong><span>Evidence diligence. Founder consent. Real treasury settlement.</span></footer>
+  </main>;
+}
