@@ -23,11 +23,28 @@ export function validateInitializeInput(input: InitializeInput): string | null {
 }
 
 export function readInitializedManager(data: unknown): string {
+  return readFundState(data)?.manager || "";
+}
+
+export type FundState = {
+  manager: string;
+  available: string;
+  max_ticket: string;
+  min_score: string;
+};
+
+export function readFundState(data: unknown): FundState | null {
   try {
     const parsed = typeof data === "string" ? JSON.parse(data) : data;
-    if (!parsed || typeof parsed !== "object" || !("manager" in parsed)) return "";
-    return String((parsed as { manager?: unknown }).manager || "");
+    if (!parsed || typeof parsed !== "object" || !("manager" in parsed)) return null;
+    const state = parsed as Record<string, unknown>;
+    return {
+      manager: String(state.manager || ""),
+      available: String(state.available || "0"),
+      max_ticket: String(state.max_ticket || "0"),
+      min_score: String(state.min_score || "0"),
+    };
   } catch {
-    return "";
+    return null;
   }
 }

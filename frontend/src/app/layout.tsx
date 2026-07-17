@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./reviewer.css";
 import { WalletProvider } from "@/components/WalletProvider";
 import { AppShell } from "@/components/AppShell";
 import { ContractProvider } from "@/components/ContractProvider";

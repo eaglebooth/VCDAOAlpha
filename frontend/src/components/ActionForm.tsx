@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { readContract, writeContract } from "@/lib/genlayer";
-import { readInitializedManager, validateInitializeInput } from "@/lib/action-validation";
+import { readFundState, type FundState, validateInitializeInput } from "@/lib/action-validation";
 import { useWallet } from "./WalletProvider";
 import { useContractAddress } from "./ContractProvider";
 
@@ -76,6 +76,7 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
   const [busy, setBusy] = useState(false);
   const [checkingState, setCheckingState] = useState(mode === "initialize" && Boolean(contract));
   const [initializedManager, setInitializedManager] = useState("");
+  const [initializedFund, setInitializedFund] = useState<FundState | null>(null);
 
   useEffect(() => {
     if (mode !== "initialize" || !contract) {
@@ -86,7 +87,9 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
     async function checkInitialization() {
       const state = await readContract("get_fund_state", [], contract);
       if (cancelled) return;
-      const manager = state.success ? readInitializedManager(state.data) : "";
+      const fund = state.success ? readFundState(state.data) : null;
+      const manager = fund?.manager || "";
+      setInitializedFund(fund);
       setInitializedManager(manager);
       if (manager) {
         setBad(false);
@@ -152,8 +155,10 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
       return;
     }
     if (mode === "initialize") {
-      const manager = readInitializedManager(before.data);
+      const fund = readFundState(before.data);
+      const manager = fund?.manager || "";
       if (manager) {
+        setInitializedFund(fund);
         setInitializedManager(manager);
         setBad(false);
         setMessage(`Treasury is already initialized by ${manager}. Use the Fund dashboard for treasury operations.`);
@@ -196,6 +201,32 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
     </Field>
   );
 
+  if (mode === "initialize" && initializedManager) {
+    return (
+      <section className="action-card reviewer-handoff">
+        <div className="form-title">
+          <span>Initialization verified</span>
+          <h2>Fund is live. Test the investment flow.</h2>
+          <code>{initializedManager}</code>
+        </div>
+        <p className="handoff-copy">
+          Initialization is intentionally one-time. Reviewers can connect any wallet,
+          submit a startup as its founder, attach evidence, and run GenLayer diligence.
+        </p>
+        <div className="fund-state-strip">
+          <div><span>Available</span><strong>{initializedFund?.available || "0"} wei</strong></div>
+          <div><span>Ticket ceiling</span><strong>{initializedFund?.max_ticket || "0"} wei</strong></div>
+          <div><span>Approval gate</span><strong>{initializedFund?.min_score || "0"}/100</strong></div>
+        </div>
+        <div className="button-row">
+          <Link className="primary-button" href="/startups/submit">Submit test startup <ArrowRight size={17} /></Link>
+          <Link className="quiet-button" href="/startups">Browse pipeline</Link>
+          <Link className="quiet-button" href="/contract">Use another deployment</Link>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <form className="action-card" onSubmit={submit}>
       <div className="form-title">
@@ -234,14 +265,10 @@ export function ActionForm({ mode, startupId = "" }: { mode: Mode; startupId?: s
         {mode === "withdraw" && <Field label="Withdrawal amount (wei)"><input type="number" min="1" value={values.value} onChange={(event) => update("value", event.target.value)} required /></Field>}
       </div>
       {message && <div className={`notice ${bad ? "error" : ""}`}>{message}</div>}
-      {initializedManager ? (
-        <Link className="primary-button" href="/fund">View live fund <ArrowRight size={17} /></Link>
-      ) : (
-        <button className="primary-button" disabled={busy || checkingState}>
-          {checkingState ? "Checking treasury state" : address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
-          <ArrowRight size={17} />
-        </button>
-      )}
+      <button className="primary-button" disabled={busy || checkingState}>
+        {checkingState ? "Checking treasury state" : address ? (busy ? "Verifying accepted transaction" : cfg[mode][1]) : "Connect wallet first"}
+        <ArrowRight size={17} />
+      </button>
       {!bad && message && <CheckCircle2 className="success-icon" />}
     </form>
   );
